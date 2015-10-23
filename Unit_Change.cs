@@ -1,4 +1,5 @@
-﻿using UnityEngine;
+﻿
+using UnityEngine;
 using System.Collections;
 using UnityEngine.UI;
 using System.Collections.Generic;
@@ -13,11 +14,13 @@ public class Unit_Change : MonoBehaviour
 
 	private int numberFrom, numberTo;// 入れ替え用、OnClick時の引数を元にする
 	private int weaponNumFrom, weaponNumTo;
+	private int selectWeaponChar, selectWeaponSlot;
 
 	UnitData[] unitData, teamA, keepData;
-	WeaponData[] weaponData;
+	UnitSlotData[,] teamASlot;
+	WeaponData[] weaponData, keepWeaponData;
 
-	GameObject _unitDataWindow, _weaponAWindow;
+	GameObject _unitDataWindow, _weaponAWindow, _changeSlotWindow;
 
 	void Start ()
 	{
@@ -25,10 +28,10 @@ public class Unit_Change : MonoBehaviour
 
 		_unitDataWindow = GameObject.Find ( "CharTeam_WIndow (0)" );
 		_weaponAWindow = GameObject.Find ( "ChangeWeapon_WIndow (0)" );
+		_changeSlotWindow = GameObject.Find ( "SelectChangeSlot_WIndow (0)" );
 		_unitDataWindow.transform.localPosition = new Vector2 ( -800, -15 );
 		_weaponAWindow.transform.localPosition = new Vector2 ( 800, -15 );
-		//_unitDataWindow.gameObject.SetActive ( false );
-		//_weaponAWindow.gameObject.SetActive ( false );
+		_changeSlotWindow.transform.localPosition = new Vector2 ( -1600, -15 );
 	}
 
 	public int GetSelectWindowCount ( string windowName )
@@ -43,12 +46,13 @@ public class Unit_Change : MonoBehaviour
 	public void EditList ()
 	{
 		int maxCount = GetSelectWindowCount( "UnitSelectWindow");
-		unitData = new UnitData[maxCount];
+		unitData = new UnitData[6];
 		teamA = new UnitData[6];
+		teamASlot = new UnitSlotData[6,4];
 		keepData = new UnitData[1];
 
-		//maxCount = GetSelectWindowCount( "WeaponSelectWindow");
 		weaponData = new WeaponData[6];
+		keepWeaponData = new WeaponData[1];
 
 		for ( int i = 0; i < maxCount; i++ )
 		{
@@ -57,8 +61,17 @@ public class Unit_Change : MonoBehaviour
 
 			// -----
 			weaponData[i] = new WeaponData ( i,  weaponName, ( ( i + 1 )  * 2 ) );
-			GameObject weaponText = GameObject.Find ( "WeaponText_List (" + i + ")" );
-			weaponText.GetComponent<Text>().text = weaponData[i].weapon_name;
+			GameObject _weaponNameText = GameObject.Find ( "WeaponText_List (" + i + ")" );
+			_weaponNameText.GetComponent<Text>().text = weaponData[i].weapon_name.ToString();
+			GameObject _weaponAttackText = GameObject.Find ( "WeaponAttack_Text (" + i + ")" );
+			_weaponAttackText.GetComponent<Text>().text = weaponData[i].attack.ToString();
+
+			for ( int j = 0; j < 4; j++ )
+			{
+				teamASlot[i,j] = new UnitSlotData ( i,  GetWeaponName( j ), ( ( i + 1 )  * 2 ) );
+				Debug.Log ( j + ": " + teamASlot[i,j] );
+			}
+
 			// -----
 
 			unitData[i] = new UnitData( ( i ), charName, ( i ) );
@@ -112,7 +125,6 @@ public class Unit_Change : MonoBehaviour
 	{
 		Sound_Manager.Instance.PlaySE(1);
 		_unitDataWindow.transform.localPosition = new Vector2 ( 0, -15 );
-		//_unitDataWindow.gameObject.SetActive ( true );
 		StopCoroutine ( "WaitForApply" );// 既にコルーチンが起動していた場合それを停止 ( 選択しなおす )
 
 		numberFrom = slotNumber;
@@ -140,23 +152,21 @@ public class Unit_Change : MonoBehaviour
 
 		changeUnitIsRunning = false;
 		RefreshListOnly();// リストを更新する
-		//_unitDataWindow.gameObject.SetActive ( false );
 
 		return;
 	}
 
 	public void ChangeWeaponFrom ( int slotNumber )
 	{
+		selectWeaponSlot = slotNumber;
 		Sound_Manager.Instance.PlaySE(1);
+		_changeSlotWindow.transform.localPosition = new Vector2 ( -1600, -15 );
 		_weaponAWindow.transform.localPosition = new Vector2 ( 0, -15 );
-		//_weaponAWindow.gameObject.SetActive ( true );
 		StopCoroutine ( "WaitForWeaponApply" );// 既にコルーチンが起動していた場合それを停止 ( 選択しなおす )
 
 		numberFrom = slotNumber;
 		Debug.Log ( "「" + numberFrom + "」" + " が選択されました…入れ替え先 ( 部隊外ウィンドウ ) を選択してください。" );
 
-//		GameObject unitOriginText = GameObject.Find ("UnitOriginPower" );
-//		unitOriginText.GetComponent<Text>().text = teamA[numberFrom].attack.ToString();
 		GameObject unitCurrentText = GameObject.Find ("UnitCurrentPower" );
 		unitCurrentText.GetComponent<Text>().text = teamA[numberFrom].attack.ToString();
 
@@ -169,28 +179,60 @@ public class Unit_Change : MonoBehaviour
 		numberTo = slotNumber;
 		Debug.Log ( "「" + numberTo + "」" + " が選択されました…決定で対応する配列の入れ替えを行います" );
 
-//		GameObject weaponOriginText = GameObject.Find ("WeaponOriginPower");
-//		weaponOriginText.GetComponent<Text>().text = weaponData[numberTo].attack.ToString();
 		GameObject unitAmountText = GameObject.Find ("UnitAmountPower");
 		unitAmountText.GetComponent<Text>().text = (weaponData[numberTo].attack + teamA[numberFrom].attack ).ToString();
 	}
 
 	public void ChangeWeaponFromTo ()
 	{
-		// 変数の入れ替え。配列keepDataに一旦保存して受け渡しを行う
-		//keepWaeponData[0].attack = teamA[numberFrom].attack;// AをXに
-		teamA[numberFrom].attack += weaponData[numberTo].attack;// BをAに
-		//weaponData[numberTo] = keepWaeponData[0];// XをAに
+		//keepWeaponData[0] = teamASlot[selectWeaponChar,selectWeaponSlot];// AをXに
+		//teamASlot[selectWeaponChar,selectWeaponSlot] = weaponData[numberTo];// BをAに
+		//weaponData[numberTo] = keepWeaponData[0];// XをAに
 
 		changeUnitIsRunning = false;
 		isApply = false;
 		RefreshListOnly();// リストを更新する
-//
+
 		Debug.Log ( this.gameObject.name + "ユニットの装備を入れ替えました。" );
-		//_weaponAWindow.gameObject.SetActive ( false );
 
 		return;
 	}
+
+	public void SelectWeaponChar ( int selectWeaponChar )
+	{
+		this.selectWeaponChar = selectWeaponChar;
+		Debug.Log ( this.selectWeaponChar + " 番の装備スロットを表示します" );
+
+		_changeSlotWindow.transform.localPosition = new Vector2 ( -0, -15 );
+
+		for ( int i = 0; i < 4; i++ )
+		{
+			GameObject _weaponSlot = GameObject.Find ( "WeaponSlotName (" + i + ")" );
+			_weaponSlot.GetComponent<Text>().text = teamASlot[selectWeaponChar,i].weapon_name.ToString();
+		}
+
+	}
+
+	public void SetBeforeInfo ( int weaponNum )
+	{
+		GameObject _beforeWeaponNameText = GameObject.Find ( "BeforeWeaponName_Text" );
+		GameObject _beforeWeaponAttackText = GameObject.Find ( "BeforeWeaponAttack_Text" );
+		GameObject _beforeWeaponImage = GameObject.Find ( "BeforeWeapon_Image" );
+
+		_beforeWeaponNameText.GetComponent<Text>().text = teamASlot[selectWeaponChar,selectWeaponSlot].weapon_name.ToString();
+		_beforeWeaponAttackText.GetComponent<Text>().text = teamASlot[selectWeaponChar,selectWeaponSlot].attack.ToString();
+	}
+
+	public void SetAfterInfo ( int weaponNum )
+	{
+		GameObject _afterWeaponNameText = GameObject.Find ( "AfterWeaponName_Text" );
+		GameObject _afterWeaponAttackText = GameObject.Find ( "AfterWeaponAttack_Text" );
+		GameObject _afterWeaponImage = GameObject.Find ( "AfterWeapon_Image" );
+
+		_afterWeaponNameText.GetComponent<Text>().text = weaponData[weaponNum].weapon_name;
+		_afterWeaponAttackText.GetComponent<Text>().text = weaponData[weaponNum].attack.ToString();
+	}
+
 	// 最終決定 後で名称変える
 	public void WeaponApply ()
 	{
@@ -234,7 +276,7 @@ public class Unit_Change : MonoBehaviour
 		yield break;
 	}
 
-	// char_noにより名称を返す。仮データなので、そのうちデータベースからちゃんと引っ張るようにする。
+	// char_noにより名称を返す。仮データなので、データベースから排出される形式が決定次第ちゃんと引っ張るようにする。
 	public string GetCharName ( int num )
 	{
 		string name = "";
@@ -337,7 +379,7 @@ public class UnitData
 
 		/*int char_no, string char_name, int groups, int useSlot, int maxSlot, int hp, int maxHp, int fuel
 		, int maxFuel, int bullet, int maxBullet, int long_power, int middle_power, int short_power, int shield_power
-		, int defense, int avoidance, int speed, int sphit, int searchEnemy, int luck, int exp*/ // 引数たち
+		, int defense, int avoidance, int speed, int sphit, int searchEnemy, int luck, int exp // データベースによって変わってくる引数たち*/
 	}
 }
 
@@ -349,6 +391,21 @@ public class WeaponData
 	public int attack = 0;
 // -----------
 	public WeaponData ( int weapon_no, string weapon_name, int attack )
+	{
+		this.weapon_no = weapon_no;
+		this.weapon_name = weapon_name;
+		this.attack = attack;
+	}
+}
+
+public class UnitSlotData
+{
+// ----------- 各ユニット固有の値
+	public int weapon_no = 0;
+	public string weapon_name = "";
+	public int attack = 0;
+// -----------
+	public UnitSlotData ( int weapon_no, string weapon_name, int attack )
 	{
 		this.weapon_no = weapon_no;
 		this.weapon_name = weapon_name;
